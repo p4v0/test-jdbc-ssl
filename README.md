@@ -1,10 +1,33 @@
-# Test JDBC SSL - Spring Boot
+# Test JDBC SSL
 
-Proyecto mínimo para probar conexiones JDBC con SSL a PostgreSQL/Aurora.
+Herramientas para probar conexiones con JDBC a PostgreSQL/Aurora.
 
-## Configuración
+## Opción 1: Script Java simple (Recomendado para pruebas rápidas)
 
-Editar `src/main/resources/application.properties`:
+**Ventajas:** Sin dependencias, ejecución inmediata, credenciales seguras.
+
+```bash
+# Ejecutar sin compilar (Java 11+)
+cd Scripts
+java -cp postgresql-42.7.4.jar TestJDBC.java "jdbc:postgresql://host:5432/db"
+```
+
+El script pedirá usuario y password de forma segura. Ver `Scripts/README.md` para más detalles.
+
+## Opción 2: Aplicación Spring Boot (Para pruebas con framework)
+
+Usar cuando necesites probar con Spring Boot, JPA, o HikariCP.
+
+### Configuración
+
+**IMPORTANTE:** No versionar credenciales reales.
+
+1. Copiar el archivo de ejemplo:
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
+```
+
+2. Editar `src/main/resources/application.properties` con tus credenciales:
 
 ```properties
 spring.datasource.url=jdbc:postgresql://<DB_HOST>:<DB_PORT>/<DB_NAME>
@@ -12,7 +35,13 @@ spring.datasource.username=<DB_USER>
 spring.datasource.password=<DB_PASSWORD>
 ```
 
-### Comportamiento de SSL
+**Alternativa más segura:** Usar variables de entorno o parámetros en runtime (ver sección "Override de configuración en runtime").
+
+---
+
+## Información sobre SSL
+
+### Comportamiento de SSL por defecto
 
 **URL sin parámetros SSL (por defecto):**
 ```
@@ -42,7 +71,7 @@ jdbc:postgresql://host:5432/database?ssl=true&sslmode=require
 **Nota importante sobre `sslrootcert`:** 
 - El parámetro `sslrootcert` en la URL **NO es soportado** por el driver JDBC de PostgreSQL
 - Es un parámetro de `libpq` (usado por psql/pgAdmin)
-- Para JDBC, el certificado debe estar en el Java truststore del sistema
+- Para JDBC, el certificado debe estar en el Java truststore del sistema si se usa un modo SSL que haga validación de él
 
 ### Ejemplos de configuración
 
@@ -68,9 +97,15 @@ spring.datasource.url=jdbc:postgresql://rds-host.amazonaws.com:5432/mydb?ssl=tru
 mvn spring-boot:run
 ```
 
-### Ejecutar con JAR compilado:
+### Compilar JAR ejecutable independiente:
 ```bash
 mvn clean package -DskipTests
+```
+
+Esto genera `target/test-jdbc-ssl-1.0.jar` que incluye todas las dependencias y puede ejecutarse en cualquier máquina con Java 17+.
+
+### Ejecutar con JAR compilado:
+```bash
 java -jar target/test-jdbc-ssl-1.0.jar
 ```
 
@@ -83,14 +118,6 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--spring.datasource.url='jdbc:p
 
 # Con JAR
 java -Dspring.datasource.url='jdbc:postgresql://host:5432/db?ssl=true&sslmode=require' -jar target/test-jdbc-ssl-1.0.jar
-```
-
-**Cambiar múltiples propiedades:**
-```bash
-java -Dspring.datasource.url='jdbc:postgresql://host:5432/db' \
-     -Dspring.datasource.username='user' \
-     -Dspring.datasource.password='pass' \
-     -jar target/test-jdbc-ssl-1.0.jar
 ```
 
 ## Probar
@@ -118,12 +145,35 @@ Buscar en logs:
 
 ## Troubleshooting
 
+### Verificar conectividad de red
+
+Antes de probar JDBC, verifica que puedes alcanzar el servidor de base de datos:
+
+**Linux/WSL:**
+```bash
+# Con netcat
+nc -zv <DB_HOST> 5432
+
+# Con curl
+curl -v telnet://<DB_HOST>:5432 --connect-timeout 5
+
+# Con bash
+timeout 5 bash -c 'cat < /dev/null > /dev/tcp/<DB_HOST>/5432' && echo "Conectado" || echo "Fallo"
+```
+
+**PowerShell (Windows):**
+```powershell
+tnc <DB_HOST> -p 5432
+```
+
+Si estos comandos fallan con timeout, el problema es de red/firewall, no de JDBC o SSL.
+
 ### Error "Connection reset" con SSL
 
-**Causa común:** Conexión desde fuera de la VPC de AWS (via VPN) puede interferir con handshake SSL.
+**Causa común:** Conexión desde fuera de la VPC de AWS (via VPN) o a través de un firewall, puede interferir con handshake SSL.
 
 **Soluciones:**
-1. Probar primero con `ssl=false` para confirmar conectividad básica
+1. Probar primero con `ssl=false` para confirmar conectividad básica sin cifrar
 2. Si funciona sin SSL pero falla con SSL:
    - Desde **dentro de la VPC** (ECS, EC2, bastion): SSL funciona correctamente
    - Desde **fuera de la VPC** (local via VPN): Puede fallar por firewall/VPN
@@ -138,7 +188,7 @@ Buscar en logs:
 ### Importar certificado RDS al Java truststore (si es necesario)
 
 ```bash
-# Descargar certificado
+# Descargar certificado (la URL varía para cada región de AWS)
 curl -o rds-ca.pem https://truststore.pki.rds.amazonaws.com/us-east-2/us-east-2-bundle.pem
 
 # Importar a Java truststore
@@ -162,13 +212,9 @@ El proyecto usa PostgreSQL JDBC Driver 42.7.4. Verificar en `pom.xml`:
 
 ## Notas de seguridad
 
-- **Nunca** commitear credenciales reales en `application.properties`
+- **Nunca** commitear credenciales reales en `application.properties`, gitignore viene configurado para evitarlo
 - Usar variables de entorno o AWS Secrets Manager en producción
 - Preferir `sslmode=verify-full` en producción para máxima seguridad
 - El modo `require` es aceptable si el certificado está en el truststore del sistema
 
-## Scripts adicionales
-
-En la carpeta `Scripts/` hay un script Java básico (`TestJDBC.java`) para probar conexiones JDBC sin Spring Boot. Útil para diagnóstico rápido de problemas de driver o SSL.
-
-Ver `Scripts/README.md` para instrucciones de uso.
+---
