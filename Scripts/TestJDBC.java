@@ -1,14 +1,17 @@
 import java.sql.*;
+import java.io.Console;
 
 /**
  * Test básico de conexión JDBC a PostgreSQL sin Spring Boot
  * 
- * Compilar:
- *   javac -cp postgresql-42.7.4.jar TestJDBC.java
+ * Ejecutar sin compilar (Java 11+):
+ *   java -cp postgresql-42.7.4.jar TestJDBC.java <URL>
+ *   (Pedirá usuario y password de forma segura)
  * 
- * Ejecutar:
- *   java -cp .:postgresql-42.7.4.jar TestJDBC
- *   (En Windows: java -cp .;postgresql-42.7.4.jar TestJDBC)
+ * Compilar y ejecutar (método tradicional):
+ *   javac -cp postgresql-42.7.4.jar TestJDBC.java
+ *   java -cp .:postgresql-42.7.4.jar TestJDBC <URL>
+ *   (En Windows: java -cp .;postgresql-42.7.4.jar TestJDBC <URL>)
  * 
  * Descargar driver PostgreSQL JDBC:
  *   https://jdbc.postgresql.org/download/
@@ -16,13 +19,30 @@ import java.sql.*;
  */
 public class TestJDBC {
     public static void main(String[] args) {
-        // Configurar según tu entorno
-        String url = "jdbc:postgresql://rds-cluster.us-east-2.rds.amazonaws.com:5432/database";
-        String user = "<DB_USER>";
-        String password = "<DB_PASSWORD>";
+        String url, user, password;
         
-        // Para forzar SSL, agregar a la URL: ?ssl=true&sslmode=require
-        // Ejemplo: jdbc:postgresql://rds-cluster.us-east-2.rds.amazonaws.com:5432/database?ssl=true&sslmode=require
+        // Validar que se proporcione la URL
+        if (args.length < 1) {
+            System.out.println("Uso: java TestJDBC <URL>");
+            System.out.println("Ejemplo: java TestJDBC \"jdbc:postgresql://host:5432/db\"");
+            System.out.println("Para SSL: java TestJDBC \"jdbc:postgresql://host:5432/db?ssl=true&sslmode=require\"");
+            System.exit(1);
+            return;
+        }
+        
+        url = args[0];
+        
+        // Pedir credenciales de forma segura
+        Console console = System.console();
+        if (console == null) {
+            System.out.println("Error: No se puede leer credenciales de forma segura (no hay consola)");
+            System.exit(1);
+            return;
+        }
+        
+        user = console.readLine("Usuario: ");
+        char[] passwordArray = console.readPassword("Password: ");
+        password = new String(passwordArray);
         
         try {
             Connection conn = DriverManager.getConnection(url, user, password);
