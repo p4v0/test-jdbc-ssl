@@ -48,10 +48,20 @@ El script pedirá usuario y password de forma segura (no quedarán en el histori
    java -cp .;postgresql-42.7.4.jar TestJDBC "jdbc:postgresql://host:5432/db"
    ```
 
-### Forzar SSL
+### Ejemplos de configuración
 
-Agregar parámetros a la URL:
-```bash
+**Forzar sin SSL desde el cliente:**
+```properties
+java -cp postgresql-42.7.4.jar TestJDBC.java "jdbc:postgresql://host:5432/db?ssl=false&sslmode=disable"
+```
+
+**Producción con SSL (servidor controla):**
+```properties
+java -cp postgresql-42.7.4.jar TestJDBC.java "jdbc:postgresql://host:5432/db"
+```
+
+**Forzar SSL desde cliente:**
+```properties
 java -cp postgresql-42.7.4.jar TestJDBC.java "jdbc:postgresql://host:5432/db?ssl=true&sslmode=require"
 ```
 
